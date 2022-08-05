@@ -1,0 +1,14 @@
+[Unit]
+Description=WASE Proxy
+After=network.target
+
+[Service]
+EnvironmentFile=/etc/default/wase
+ExecStart=/opt/WASE/WASEProxy.py -e ${ES_HOST}:80 -i ${ES_INDEX} ${PARAMS}
+WorkingDirectory=/opt/WASE
+User=wase
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

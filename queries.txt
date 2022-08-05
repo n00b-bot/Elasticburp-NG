@@ -1,0 +1,138 @@
+Simple
+======
+All responses that set cookies:
+response.headernames:"Set-Cookie"
+
+All responses without X-Frame-Options header:
+NOT response.headernames:"X-Frame-Options"
+
+All detected HTML responses:
+response.inferred_content_type:html
+
+Detected and declared HTML responses:
+response.inferred_content_type:html OR response.content_type:html
+
+All request with a particular parameter:
+request.parameternames:csrftoken
+
+All request without a particular parameter:
+NOT request.parameternames:csrftoken
+
+...only POST requests:
+request.method:POST -request.parameternames.raw:"csrftoken" 
+
+All responses without a doctype definition:
+response.inferred_content_type:html -doctype
+
+...and only 200 responses:
+response.status:200 AND response.inferred_content_type:html -doctype
+
+All responses that were recognized as HTML but declared as something different:
+response.inferred_content_type:html -response.content_type:html
+
+JSON
+====
+
+All requests with HEADERNAME header:
+{
+    "query": {
+        "nested": {
+            "path": "response.headers",
+            "query": {
+                "match_phrase": {
+                    "response.headers.name": "HEADERNAME"
+                }
+            }
+        }
+    }
+}
+
+All requests without HEADERNAME header:
+{
+    "query": {
+        "bool": {
+            "must_not": {
+                "nested": {
+                    "path": "response.headers",
+                    "query": {
+                        "match_phrase": {
+                            "response.headers.name": "HEADERNAME"
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+All requests with HEADERNAME header with value VALUE:
+{
+    "query": {
+        "nested": {
+            "path": "response.headers",
+            "query": {
+                "bool": {
+                    "must_not": {
+                        "match_phrase": {
+                            "response.headers.name": "X-Frame-Options"
+                        },
+                        "match_phrase": {
+                            "response.headers.value": "SAMEORIGIN"
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+All requests without HEADERNAME header with value VALUE:
+{
+    "query": {
+        "bool": {
+            "must_not": {
+                "nested": {
+                    "path": "response.headers",
+                    "query": {
+                        "match_phrase": {
+                            "response.headers.name": "HEADERNAME",
+                            "response.headers.value": "VALUE"
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+All POST requests:
+{
+    "query": {
+        "match_phrase": {
+            "request.method": "POST"
+        }
+    }
+}
+
+All POST requests without parameter PARAMNAME:
+{
+    "query": {
+        "bool": {
+            "must": {
+                "match_phrase": {
+                    "request.method": "POST"
+                }
+            },
+            "must_not": {
+                "nested": {
+                    "path": "request.parameters",
+                    "query": {
+                        "match_phrase": {
+                            "request.parameters.name": "PARAMNAME"
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

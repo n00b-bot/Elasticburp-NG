@@ -1,0 +1,11 @@
+Uuid: 67f5c31f93d04ad3a3b0a1808b3648fa
+ExtensionType: 2
+Name: ElasticBurp
+RepoName: elastic-burp
+ScreenVersion: 1.4
+SerialVersion: 8
+MinPlatformVersion: 2
+ProOnly: False
+Author: Thomas Patzke
+ShortDescription: Stores requests/responses in an ElasticSearch index.
+EntryPoint: ElasticBurp.py
