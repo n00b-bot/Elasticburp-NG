@@ -24,8 +24,15 @@ from doc_HttpRequestResponse import DocHTTPRequestResponse
 from datetime import datetime
 from email.utils import parsedate_tz, mktime_tz
 from tzlocal import get_localzone
+import hashlib
 import re
-
+import redis
+from pprint import pprint
+import traceback
+import time
+from redis import connection
+import errno
+import socket
 try:
     tz = get_localzone()
 except:
@@ -47,11 +54,11 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
         self.callbacks.registerHttpListener(self)
         self.callbacks.registerContextMenuFactory(self)
         self.out = callbacks.getStdout()
-
         self.lastTimestamp = None
         self.confESHost = self.callbacks.loadExtensionSetting("elasticburp.host") or ES_host
         self.confESIndex = self.callbacks.loadExtensionSetting("elasticburp.index") or ES_index
         self.confBurpTools = int(self.callbacks.loadExtensionSetting("elasticburp.tools") or Burp_Tools)
+        self.confRedis = False
         saved_onlyresp = self.callbacks.loadExtensionSetting("elasticburp.onlyresp") 
         if saved_onlyresp == "True":
             self.confBurpOnlyResp = True
@@ -63,14 +70,19 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
         self.callbacks.addSuiteTab(self)
         self.applyConfig()
 
+
     def applyConfig(self):
         try:
             print("Connecting to '%s', index '%s'" % (self.confESHost, self.confESIndex))
             self.es = connections.create_connection(hosts=[self.confESHost],timeout=30)
             print("connect elastic search successful")
             self.idx = Index(self.confESIndex)
-            print(self.idx)
             self.idx.document(DocHTTPRequestResponse)
+            if self.confRedis:
+                connection.NONBLOCKING_EXCEPTION_ERROR_NUMBERS[socket.error] = errno.EAGAIN
+                connection.NONBLOCKING_EXCEPTIONS = tuple(connection.NONBLOCKING_EXCEPTION_ERROR_NUMBERS.keys())
+                self.redis = redis.Redis(host='localhost', port=6379, db=0)
+                print("redis is config")
             if self.idx.exists():
                 self.idx.open()
                 print("idx exists")
@@ -80,6 +92,7 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
             self.callbacks.saveExtensionSetting("elasticburp.host", self.confESHost)
             self.callbacks.saveExtensionSetting("elasticburp.index", self.confESIndex)
             self.callbacks.saveExtensionSetting("elasticburp.tools", str(self.confBurpTools))
+
             self.callbacks.saveExtensionSetting("elasticburp.onlyresp", str(int(self.confBurpOnlyResp)))
         except Exception as e:
             JOptionPane.showMessageDialog(self.panel, "<html><p style='width: 300px'>Error while initializing ElasticSearch: %s</p></html>" % (str(e)), "Error", JOptionPane.ERROR_MESSAGE)
@@ -94,6 +107,7 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
         self.confESIndex = self.uiESIndex.getText()
         self.confBurpTools = int((self.uiCBSuite.isSelected() and IBurpExtenderCallbacks.TOOL_SUITE) | (self.uiCBTarget.isSelected() and IBurpExtenderCallbacks.TOOL_TARGET) | (self.uiCBProxy.isSelected() and IBurpExtenderCallbacks.TOOL_PROXY) | (self.uiCBSpider.isSelected() and IBurpExtenderCallbacks.TOOL_SPIDER) | (self.uiCBScanner.isSelected() and IBurpExtenderCallbacks.TOOL_SCANNER) | (self.uiCBIntruder.isSelected() and IBurpExtenderCallbacks.TOOL_INTRUDER) | (self.uiCBRepeater.isSelected() and IBurpExtenderCallbacks.TOOL_REPEATER) | (self.uiCBSequencer.isSelected() and IBurpExtenderCallbacks.TOOL_SEQUENCER) | (self.uiCBExtender.isSelected() and IBurpExtenderCallbacks.TOOL_EXTENDER))
         self.confBurpOnlyResp = self.uiCBOptRespOnly.isSelected()
+        self.confRedis= self.uiRedis.isSelected()
         self.applyConfig()
 
     def resetConfigUI(self, event):
@@ -161,6 +175,9 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
         uiToolsLine.add(Box.createRigidArea(Dimension(10, 0)))
         self.uiCBExtender = JCheckBox("Extender")
         uiToolsLine.add(self.uiCBExtender)
+        uiToolsLine.add(Box.createRigidArea(Dimension(10, 0)))
+        self.uiRedis = JCheckBox("Redis Cache")
+        uiToolsLine.add(self.uiRedis)
         self.panel.add(uiToolsLine)
         self.panel.add(Box.createRigidArea(Dimension(0, 10)))
 
@@ -182,13 +199,33 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
 
         return self.panel
 
+    def checkHash(self,hashes):
+        check = self.redis.get(hashes)
+        print(check==None
+        )
+        if check == None:
+            self.redis.set(hashes,"1")
+            return False
+        else:
+            return True
+
     ### IHttpListener ###
     def processHttpMessage(self, tool, isRequest, msg):
+        print(tool)
         if not tool & self.confBurpTools or isRequest and self.confBurpOnlyResp:
             return
 
         doc = self.genESDoc(msg)
-        doc.save()
+        doc.hashes=hashlib.md5("".join(map(chr, msg.getRequest()))).hexdigest()
+        try:
+            #pprint(vars(R))
+            if ! self.checkHash(doc.hashes):
+                print(doc.hashes+" is cached")
+                doc.save()
+            else:
+                print("cached :"+doc.hashes)
+        except Exception as e:
+            print(traceback.format_exc())
 
     ### IContextMenuFactory ###
     def createMenuItems(self, invocation):

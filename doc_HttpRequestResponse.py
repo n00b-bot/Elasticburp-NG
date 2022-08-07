@@ -16,7 +16,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from elasticsearch_dsl import Document, Text, Keyword, Integer, Short, Date, Object, Nested, MetaField, analyzer
+from elasticsearch_dsl import Document, Text, Keyword, Integer, Short, Date, Object, Nested, MetaField, analyzer, Murmur3
 from datetime import datetime
 import re
 from WASEHTMLParser import WASEHTMLParser
@@ -42,6 +42,7 @@ identifierAnalyzer = analyzer("identifier",
         )
 
 class DocHTTPRequestResponse(Document):
+    hashes=  Murmur3()
     timestamp = Date()
     protocol = Keyword()
     host = Keyword()
