@@ -201,8 +201,6 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
 
     def checkHash(self,hashes):
         check = self.redis.get(hashes)
-        print(check==None
-        )
         if check == None:
             self.redis.set(hashes,"1")
             return False
@@ -211,7 +209,6 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
 
     ### IHttpListener ###
     def processHttpMessage(self, tool, isRequest, msg):
-        print(tool)
         if not tool & self.confBurpTools or isRequest and self.confBurpOnlyResp:
             return
 
@@ -219,7 +216,8 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
         doc.hashes=hashlib.md5("".join(map(chr, msg.getRequest()))).hexdigest()
         try:
             #pprint(vars(R))
-            if ! self.checkHash(doc.hashes):
+            check=self.checkHash(doc.hashes)
+            if not check:
                 print(doc.hashes+" is cached")
                 doc.save()
             else:
