@@ -27,12 +27,12 @@ from tzlocal import get_localzone
 import hashlib
 import re
 import redis
-from pprint import pprint
 import traceback
 import time
 from redis import connection
 import errno
 import socket
+import platform
 try:
     tz = get_localzone()
 except:
@@ -45,6 +45,7 @@ ES_index = "wase-burp"
 Burp_Tools = IBurpExtenderCallbacks.TOOL_PROXY
 Burp_onlyResponses = True       # Usually what you want, responses also contain requests
 #########################################
+
 
 class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
     def registerExtenderCallbacks(self, callbacks):
@@ -66,7 +67,7 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
             self.confBurpOnlyResp = False
         else:
             self.confBurpOnlyResp = bool(int(saved_onlyresp or Burp_onlyResponses))
-
+        
         self.callbacks.addSuiteTab(self)
         self.applyConfig()
 
@@ -74,15 +75,17 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
     def applyConfig(self):
         try:
             print("Connecting to '%s', index '%s'" % (self.confESHost, self.confESIndex))
-            self.es = connections.create_connection(hosts=[self.confESHost],timeout=30)
+            self.es = connections.create_connection(hosts=[self.confESHost],timeout=1)
             print("connect elastic search successful")
             self.idx = Index(self.confESIndex)
             self.idx.document(DocHTTPRequestResponse)
             if self.confRedis:
-                connection.NONBLOCKING_EXCEPTION_ERROR_NUMBERS[socket.error] = errno.EAGAIN
-                connection.NONBLOCKING_EXCEPTIONS = tuple(connection.NONBLOCKING_EXCEPTION_ERROR_NUMBERS.keys())
-                self.redis = redis.Redis(host='localhost', port=6379, db=0)
-                print("redis is config")
+                os_version = get_os_version();
+                if re.match("windows", os_version):
+                    connection.NONBLOCKING_EXCEPTION_ERROR_NUMBERS[socket.error] = errno.EAGAIN
+                    connection.NONBLOCKING_EXCEPTIONS = tuple(connection.NONBLOCKING_EXCEPTION_ERROR_NUMBERS.keys())
+                    self.redis = redis.Redis(host='localhost', port=6379, db=0)
+                    print("redis is config")
             if self.idx.exists():
                 self.idx.open()
                 print("idx exists")
@@ -214,17 +217,19 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
 
         doc = self.genESDoc(msg)
         doc.hashes=hashlib.md5("".join(map(chr, msg.getRequest()))).hexdigest()
-        try:
-            #pprint(vars(R))
-            check=self.checkHash(doc.hashes)
-            if not check:
-                print(doc.hashes+" is cached")
-                doc.save()
-            else:
-                print("cached :"+doc.hashes)
-        except Exception as e:
-            print(traceback.format_exc())
-
+        if self.confRedis:
+            try:
+                #pprint(vars(R))
+                check=self.checkHash(doc.hashes)
+                if not check:
+                    print(doc.hashes+" is cached")
+                    doc.save()
+                else:
+                    print("cached :"+doc.hashes)
+            except Exception as e:
+                print(traceback.format_exc())
+        else:
+            doc.save()
     ### IContextMenuFactory ###
     def createMenuItems(self, invocation):
         menuItems = list()
@@ -344,12 +349,19 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
             bodyOffset = iResponse.getBodyOffset()
             doc.response.body = response[bodyOffset:].tostring().decode("ascii", "replace")
 
-            if timeStampFromResponse:
-                if dateHeader:
-                    try:
-                        doc.timestamp = datetime.fromtimestamp(mktime_tz(parsedate_tz(dateHeader)), tz) # try to use date from response header "Date"
-                        self.lastTimestamp = doc.timestamp
-                    except:
-                        doc.timestamp = self.lastTimestamp      # fallback: last stored timestamp. Else: now
+            # if timeStampFromResponse:
+            #     if dateHeader:
+            #         try:
+            #             doc.timestamp = datetime.fromtimestamp(mktime_tz(parsedate_tz(dateHeader)), tz) # try to use date from response header "Date"
+            #             self.lastTimestamp = doc.timestamp
+            #         except:
+            #             doc.timestamp = self.lastTimestamp      # fallback: last stored timestamp. Else: now
 
         return doc
+
+def get_os_version():
+    ver = sys.platform.lower()
+    if ver.startswith('java'):
+        import java.lang
+        ver = java.lang.System.getProperty("os.name").lower()
+    return ver
