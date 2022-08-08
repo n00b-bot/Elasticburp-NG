@@ -19,5 +19,5 @@ fix something to run :))
 7. Enjoy
 # Todo 
 
-[x] Reduce duplicated requests with redis.
+- [x] Reduce duplicated requests with redis.
 [] hash map requests for sharing.
