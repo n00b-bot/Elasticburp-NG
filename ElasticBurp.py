@@ -34,7 +34,6 @@ import time
 from redis import connection
 import errno
 import socket
-from IssueTable import IssueTable
 
 
 try:
