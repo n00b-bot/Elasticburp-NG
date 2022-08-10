@@ -20,4 +20,4 @@ fix something to run :))
 # Todo 
 
 - [x] Reduce duplicated requests with redis.
-- [ ] hash map requests for sharing.
+- [x] Requests Sharing.
