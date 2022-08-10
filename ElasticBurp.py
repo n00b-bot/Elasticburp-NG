@@ -15,7 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
  
 from burp import IBurpExtender, IBurpExtenderCallbacks, IHttpListener, IRequestInfo, IParameter, IContextMenuFactory, ITab
-from javax.swing import JMenuItem, ProgressMonitor, JPanel, BoxLayout, JLabel, JTextField, JCheckBox, JButton, Box, JOptionPane, JTextArea, JScrollPane, JTable, table
+from javax.swing import JMenuItem, ProgressMonitor, JPanel, BoxLayout, JLabel, JTextField, JCheckBox, JButton, Box, JOptionPane, JTextArea, JScrollPane, JTable, table, JPopupMenu
 from java.awt import Dimension, Color
 from java.awt.event import MouseListener
 from elasticsearch_dsl.connections import connections
@@ -38,6 +38,7 @@ import threading
 import base64
 import getRequestFromHash
 import sys
+import array
 
 reload(sys)  
 sys.setdefaultencoding('utf-8')
@@ -110,12 +111,26 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
 		hash.strip()
 		esServer = "http://" + self.confESHost + ":9200"
 		esIndex = self.confESIndex
-		req = getRequestFromHash.getReqFromHash(esServer, esIndex, hash)
-		if req == "empty":
+		result = getRequestFromHash.getReqFromHash(esServer, esIndex, hash)
+		if result.req == "empty":
 			self.uiOutReq.setText("Not found")
 		else:
-			self.uiOutReq.setText(req)
+			if len(result.pro) == 0 and len(result.host) ==  0:
+				print("Error on finding request")
+			else:
+				self.reqHost = result.host[0]
+				self.proto = result.pro[0]
+				self.reqPort = result.port[0]
+				self.uiOutReq.setText(result.req)
 
+	def sendRequestRepeaterConfig(self):
+		reqtext = self.uiOutReq.getText()
+		host = self.reqHost
+		port = int(self.reqPort)
+		proto  = str(self.proto)
+		secure = True if proto == "https" else False
+		req = array.array("b",str(reqtext))
+		self.callbacks.sendToRepeater(host, port, secure, req, "ElasticBurp")
 
 	### ITab ###
 	def getTabCaption(self):
@@ -145,8 +160,10 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
 		self.uiCBOptRespOnly.setSelected(self.confBurpOnlyResp)
 
 	def hashGetConfigUI(self, event):
-		self.hashVal = self.uiHashVal.getText()
 		self.hashGetConfig()
+
+	def sendRequestRepeaterConfigUI(self, event):
+		self.sendRequestRepeaterConfig()
 
 	def getUiComponent(self):
 		self.panel = JPanel()
@@ -234,8 +251,9 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
 		self.uiHashGen.setAlignmentX(JPanel.LEFT_ALIGNMENT)
 		self.uiHashVal = JTextField(40)
 		self.uiHashVal.setMaximumSize(self.uiHashVal.getPreferredSize())
-		self.uiHashGen.add(JButton("Get", actionPerformed=self.hashGetConfigUI))
 		self.uiHashGen.add(self.uiHashVal)
+		self.uiHashGen.add(JButton("Get", actionPerformed=self.hashGetConfigUI))
+		self.uiHashGen.add(JButton("Send to Repeater", actionPerformed=self.sendRequestRepeaterConfigUI))
 		self.panel.add(self.uiHashGen)
 
 
@@ -249,7 +267,6 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
 		self.uiOutLine.add(self.uiOutReqSP)
 		self.panel.add(self.uiOutLine)
 
-
 		return self.panel
 
 	def checkHash(self,hashes):
@@ -259,15 +276,11 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
 			return False
 		else:
 			return True
-
-	#def genBase64():
 		
 	def genGetHash(self,msg):
 		def menuGetHash(e):
 			hash = hashlib.md5(bytearray(msg.getRequest()).decode('utf-8')).hexdigest()
-			print(hash)
 			self.uiHashVal.setText(hash)
-			#JOptionPane.showMessageDialog(self.panel, hash, "Finished", JOptionPane.INFORMATION_MESSAGE)
 		return menuGetHash
 
 

@@ -3,6 +3,12 @@ import json, requests
 import re
 import base64
 
+class getRequestComponent():
+	def __init__(self, req, host, port, pro):
+		self.req = req
+		self.host = host
+		self.port = port
+		self.pro = pro	
 # Python dictionary object representing an Elasticsearch JSON query:
 #def getReqFromHash(hash):
 def getReqFromHash(esServer, esIndex, hash):
@@ -68,9 +74,12 @@ def getReqFromHash(esServer, esIndex, hash):
 	}
 	search_param['query']['bool']['filter'][0]['match_phrase']['hashes'] = str(hash)
 	res = elastic_client.search(index=str(esIndex), body=search_param)
-	res_base64=re.findall("(?<=\'request.asBase64': \[u').*?(?='\]\}\,)",str(res))
+	res_base64 = res.get('hits').get('hits')[0].get('fields').get('request.asBase64')
+	host = res.get('hits').get('hits')[0].get('fields').get('request.headers')[0].get('value')
+	port = res.get('hits').get('hits')[0].get('fields').get('port')
+	proto = res.get('hits').get('hits')[0].get('fields').get('protocol')
 	if len(res_base64) == 0:
 		return "empty"
 	else:
 		req = base64.b64decode(res_base64[0]).decode("utf-8")
-		return req
+		return getRequestComponent(req, host, port, proto)
