@@ -17,6 +17,8 @@ fix something to run :))
 6. Check the Output Log to confirm your connection
 ![image](https://user-images.githubusercontent.com/97270758/183054869-7cee7208-3e4e-4227-a63d-67e864c95478.png)
 7. Enjoy
+
+# [Change Log](CHANGELOG.md) 
 # Todo 
 
 - [x] Reduce duplicated requests with redis.
