@@ -68,7 +68,8 @@ class DocHTTPRequestResponse(Document):
                         'value': Text(fields={'keyword': Keyword()})
                         }
                     ),
-                'body': Text()
+                'body': Text(),
+                'asBase64':Keyword()
                 }
             )
     response = Object(

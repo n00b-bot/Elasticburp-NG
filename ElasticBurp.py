@@ -34,8 +34,12 @@ import time
 from redis import connection
 import errno
 import socket
+import threading
+import base64
+import sys
 
-
+reload(sys)  
+sys.setdefaultencoding('utf8')
 try:
 	tz = get_localzone()
 except:
@@ -77,7 +81,7 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
 	def applyConfig(self):
 		try:
 			print("Connecting to '%s', index '%s'" % (self.confESHost, self.confESIndex))
-			self.es = connections.create_connection(hosts=[self.confESHost],timeout=1)
+			self.es = connections.create_connection(hosts=[self.confESHost],timeout=20)
 			print("connect elastic search successful")
 			self.idx = Index(self.confESIndex)
 			self.idx.document(DocHTTPRequestResponse)
@@ -234,9 +238,11 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
 		else:
 			return True
 
+	#def genBase64():
+		
 	def genGetHash(self,msg):
 		def menuGetHash(e):
-			hash = hashlib.md5("".join(map(chr, msg.getRequest()))).hexdigest()
+			hash = hashlib.md5(bytearray(msg.getRequest()).decode('utf-8')).hexdigest()
 			print(hash)
 			self.uiHashVal.setText(hash)
 			#JOptionPane.showMessageDialog(self.panel, hash, "Finished", JOptionPane.INFORMATION_MESSAGE)
@@ -249,17 +255,16 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
 			return
 
 		doc = self.genESDoc(msg)
-		doc.hashes=hashlib.md5("".join(map(chr, msg.getRequest()))).hexdigest()
-		try:
-			#pprint(vars(R))
-			check=self.checkHash(doc.hashes)
-			if not check:
-				print(doc.hashes+" is cached")
-				doc.save()
-			else:
-				print("cached :"+doc.hashes)
-		except Exception as e:
-			print(traceback.format_exc())
+		doc.request.asBase64= base64.b64encode(bytearray(msg.getRequest()).decode('utf-8'))
+		doc.hashes=hashlib.md5(bytearray(msg.getRequest()).decode('utf-8')).hexdigest()
+	
+		check=self.checkHash(doc.hashes)
+		if not check:
+			print(doc.hashes+" is cached")
+			t1=threading.Thread(target=doc.save, args=())
+			t1.start()
+		else:
+			print("cached :"+doc.hashes)
 
 	### IContextMenuFactory ###
 	def createMenuItems(self, invocation):
