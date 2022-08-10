@@ -36,7 +36,9 @@ import errno
 import socket
 import threading
 import base64
+import getRequestFromHash
 import sys
+
 reload(sys)  
 sys.setdefaultencoding('utf-8')
 try:
@@ -47,7 +49,7 @@ reDateHeader = re.compile("^Date:\s*(.*)$", flags=re.IGNORECASE)
 
 ### Config (TODO: move to config tab) ###
 ES_host = "localhost"
-ES_index = "wase-burp"
+ES_index = "wase-thread"
 Burp_Tools = IBurpExtenderCallbacks.TOOL_PROXY
 Burp_onlyResponses = True       # Usually what you want, responses also contain requests
 #########################################
@@ -104,7 +106,15 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
 			JOptionPane.showMessageDialog(self.panel, "<html><p style='width: 300px'>Error while initializing ElasticSearch: %s</p></html>" % (str(e)), "Error", JOptionPane.ERROR_MESSAGE)
 	
 	def hashGetConfig(self):
-		print("lmao")
+		hash = self.uiHashVal.getText()
+		hash.strip()
+		esServer = "http://" + self.confESHost + ":9200"
+		esIndex = self.confESIndex
+		req = getRequestFromHash.getReqFromHash(esServer, esIndex, hash)
+		if req == "empty":
+			self.uiOutReq.setText("Not found")
+		else:
+			self.uiOutReq.setText(req)
 
 
 	### ITab ###
@@ -210,7 +220,9 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
 		uiButtonsLine.add(JButton("Reset", actionPerformed=self.resetConfigUI))
 		self.panel.add(uiButtonsLine)
 		self.resetConfigUI(None)
-		
+
+		#-----------Generate Request from Hash Function GUI-------------
+
 		self.uiLogLine = JPanel()
 		self.uiLogLine.setLayout(BoxLayout(self.uiLogLine, BoxLayout.LINE_AXIS))
 		self.uiLogLine.setAlignmentX(JPanel.LEFT_ALIGNMENT)
@@ -218,13 +230,24 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
 		self.panel.add(self.uiLogLine)
 
 		self.uiHashGen = JPanel()
-		#self.uiHashGen.setLayout(BoxLayout(self.uiHashGen, BoxLayout.LINE_AXIS))
+		self.uiHashGen.setLayout(BoxLayout(self.uiHashGen, BoxLayout.LINE_AXIS))
 		self.uiHashGen.setAlignmentX(JPanel.LEFT_ALIGNMENT)
 		self.uiHashVal = JTextField(40)
 		self.uiHashVal.setMaximumSize(self.uiHashVal.getPreferredSize())
 		self.uiHashGen.add(JButton("Get", actionPerformed=self.hashGetConfigUI))
 		self.uiHashGen.add(self.uiHashVal)
 		self.panel.add(self.uiHashGen)
+
+
+		self.uiOutLine = JPanel()
+		self.uiOutLine.setLayout(BoxLayout(self.uiOutLine, BoxLayout.LINE_AXIS))
+		self.uiOutLine.setAlignmentX(JPanel.LEFT_ALIGNMENT)
+		self.uiOutReqSP = JScrollPane()
+		self.uiOutReq = JTextArea()
+		self.uiOutReq.setLineWrap(True)
+		self.uiOutReqSP.setViewportView(self.uiOutReq)
+		self.uiOutLine.add(self.uiOutReqSP)
+		self.panel.add(self.uiOutLine)
 
 
 		return self.panel
