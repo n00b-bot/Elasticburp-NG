@@ -36,8 +36,7 @@ import errno
 import socket
 import threading
 import base64
-#import sys
-
+import sys
 reload(sys)  
 sys.setdefaultencoding('utf-8')
 try:
