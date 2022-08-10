@@ -36,10 +36,10 @@ import errno
 import socket
 import threading
 import base64
-import sys
+#import sys
 
 reload(sys)  
-sys.setdefaultencoding('utf8')
+sys.setdefaultencoding('utf-8')
 try:
 	tz = get_localzone()
 except:
@@ -253,18 +253,20 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
 	def processHttpMessage(self, tool, isRequest, msg):
 		if not tool & self.confBurpTools or isRequest and self.confBurpOnlyResp:
 			return
-
+		
 		doc = self.genESDoc(msg)
 		doc.request.asBase64= base64.b64encode(bytearray(msg.getRequest()).decode('utf-8'))
 		doc.hashes=hashlib.md5(bytearray(msg.getRequest()).decode('utf-8')).hexdigest()
-	
-		check=self.checkHash(doc.hashes)
-		if not check:
-			print(doc.hashes+" is cached")
-			t1=threading.Thread(target=doc.save, args=())
-			t1.start()
+		t1=threading.Thread(target=doc.save, args=())
+		if self.confRedis:
+			check=self.checkHash(doc.hashes)
+			if not check:
+				print(doc.hashes+" is cached")
+				t1.start()
+			else:
+				print("cached :"+doc.hashes)
 		else:
-			print("cached :"+doc.hashes)
+			t1.start()
 
 	### IContextMenuFactory ###
 	def createMenuItems(self, invocation):
