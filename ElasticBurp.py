@@ -262,6 +262,9 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
 		self.uiOutLine.setAlignmentX(JPanel.LEFT_ALIGNMENT)
 		self.uiOutReqSP = JScrollPane()
 		self.uiOutReq = JTextArea()
+		menu=JPopupMenu("Popup")
+		menu.add(JMenuItem("Send To Repeater",actionPerformed=self.sendRequestRepeaterConfigUI))
+		self.uiOutReq.componentPopupMenu=menu
 		self.uiOutReq.setLineWrap(True)
 		self.uiOutReqSP.setViewportView(self.uiOutReq)
 		self.uiOutLine.add(self.uiOutReqSP)
