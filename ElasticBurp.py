@@ -218,6 +218,7 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
 		uiToolsLine.add(self.uiCBExtender)
 		uiToolsLine.add(Box.createRigidArea(Dimension(10, 0)))
 		self.uiRedis = JCheckBox("Redis Cache")
+		self.uiRedis.setSelected(True)
 		uiToolsLine.add(self.uiRedis)
 		self.panel.add(uiToolsLine)
 		self.panel.add(Box.createRigidArea(Dimension(0, 10)))
