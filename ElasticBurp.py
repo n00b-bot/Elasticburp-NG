@@ -112,16 +112,19 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
 		esServer = "http://" + self.confESHost + ":9200"
 		esIndex = self.confESIndex
 		result = getRequestFromHash.getReqFromHash(esServer, esIndex, hash)
-		if result.req == "empty":
-			self.uiOutReq.setText("Not found")
-		else:
-			if len(result.pro) == 0 and len(result.host) ==  0:
-				print("Error on finding request")
+		try:		
+			if result.req == "empty":
+				self.uiOutReq.setText("Not found")
 			else:
-				self.reqHost = result.host[0]
-				self.proto = result.pro[0]
-				self.reqPort = result.port[0]
-				self.uiOutReq.setText(result.req)
+				if len(result.pro) == 0 and len(result.host) ==  0:
+					self.uiOutReq.setText("Error on finding request")
+				else:
+					self.reqHost = result.host[0]
+					self.proto = result.pro[0]
+					self.reqPort = result.port[0]
+					self.uiOutReq.setText(result.req)
+		except:
+			self.uiOutReq.setText("Can't find " + hash)
 
 	def sendRequestRepeaterConfig(self):
 		reqtext = self.uiOutReq.getText()
