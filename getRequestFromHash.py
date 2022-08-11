@@ -23,7 +23,7 @@ def getReqFromHash(esServer, esIndex, hash):
 		else:
 			try:
 				req = base64.b64decode(res_base64[0]).decode("utf-8")
-				host = res.get('hits').get('hits')[0].get('fields').get('request.headers')[0].get('value')
+				host = res.get('hits').get('hits')[0].get('fields').get('host')
 				port = res.get('hits').get('hits')[0].get('fields').get('port')
 				proto = res.get('hits').get('hits')[0].get('fields').get('protocol')
 				return getRequestComponent(req, host, port, proto)
