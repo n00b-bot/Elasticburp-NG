@@ -14,8 +14,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
  
-from burp import IBurpExtender, IBurpExtenderCallbacks, IHttpListener, IRequestInfo, IParameter, IContextMenuFactory, ITab
-from javax.swing import JMenuItem, ProgressMonitor, JPanel, BoxLayout, JLabel, JTextField, JCheckBox, JButton, Box, JOptionPane, JTextArea, JScrollPane, JTable, table, JPopupMenu
+from burp import IBurpExtender, IBurpExtenderCallbacks, IHttpListener, IRequestInfo, IParameter, IContextMenuFactory, ITab, IMessageEditorController
+from javax.swing import JMenuItem, ProgressMonitor, JPanel, BoxLayout, JLabel, JTextField, JCheckBox, JButton, Box, JOptionPane, JTextArea, JScrollPane, JTable, table, JPopupMenu, JTabbedPane, JSplitPane
 from java.awt import Dimension, Color
 from java.awt.event import MouseListener
 from elasticsearch_dsl.connections import connections
@@ -39,6 +39,7 @@ import base64
 import getRequestFromHash
 import sys
 import array
+from OutputTable import IssueTable
 
 reload(sys)  
 sys.setdefaultencoding('utf-8')
@@ -55,7 +56,7 @@ Burp_Tools = IBurpExtenderCallbacks.TOOL_PROXY
 Burp_onlyResponses = True       # Usually what you want, responses also contain requests
 #########################################
 
-class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
+class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, IMessageEditorController, ITab):
 	def registerExtenderCallbacks(self, callbacks):
 		self.callbacks = callbacks
 		self.helpers = callbacks.getHelpers()
@@ -84,7 +85,6 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
 		try:
 			print("Connecting to '%s', index '%s'" % (self.confESHost, self.confESIndex))
 			self.es = connections.create_connection(hosts=[self.confESHost],timeout=20)
-			print("connect elastic search successful")
 			self.idx = Index(self.confESIndex)
 			self.idx.document(DocHTTPRequestResponse)
 			if self.confRedis:
@@ -101,10 +101,9 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
 			self.callbacks.saveExtensionSetting("elasticburp.host", self.confESHost)
 			self.callbacks.saveExtensionSetting("elasticburp.index", self.confESIndex)
 			self.callbacks.saveExtensionSetting("elasticburp.tools", str(self.confBurpTools))
-
 			self.callbacks.saveExtensionSetting("elasticburp.onlyresp", str(int(self.confBurpOnlyResp)))
 		except Exception as e:
-			JOptionPane.showMessageDialog(self.panel, "<html><p style='width: 300px'>Error while initializing ElasticSearch: %s</p></html>" % (str(e)), "Error", JOptionPane.ERROR_MESSAGE)
+			JOptionPane.showMessageDialog(self.panelBasic, "<html><p style='width: 300px'>Error while initializing ElasticSearch: %s</p></html>" % (str(e)), "Error", JOptionPane.ERROR_MESSAGE)
 	
 	def hashGetConfig(self):
 		hash = self.uiHashVal.getText()
@@ -112,7 +111,7 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
 		esServer = "http://" + self.confESHost + ":9200"
 		esIndex = self.confESIndex
 		result = getRequestFromHash.getReqFromHash(esServer, esIndex, hash)
-		try:		
+		try:        
 			if result.req == "empty":
 				self.uiOutReq.setText("Not found")
 			else:
@@ -133,11 +132,14 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
 		proto  = str(self.proto)
 		secure = True if proto == "https" else False
 		req = array.array("b",str(reqtext))
-		self.callbacks.sendToRepeater(host, port, secure, req, "ElasticBurp")
+		self.callbacks.sendToRepeater(host, port, secure, req, "ElasticBurp-NG")
+
+	def queryASConfig(self):
+		print("haha")
 
 	### ITab ###
 	def getTabCaption(self):
-		return "ElasticBurp"
+		return "ElasticBurp-NG"
 
 	def applyConfigUI(self, event):
 		#self.idx.close()
@@ -168,9 +170,17 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
 	def sendRequestRepeaterConfigUI(self, event):
 		self.sendRequestRepeaterConfig()
 
+	def queryASConfigUI(self, event):
+		self.queryASConfig()
+
 	def getUiComponent(self):
-		self.panel = JPanel()
-		self.panel.setLayout(BoxLayout(self.panel, BoxLayout.PAGE_AXIS))
+		self.panelBasic = JPanel()
+		self.panelAvSearch = JPanel()
+		self.tabIssue = JTabbedPane()
+
+		#---------------------Push and Get Feature----------------------------
+		
+		self.panelBasic.setLayout(BoxLayout(self.panelBasic, BoxLayout.PAGE_AXIS))
 
 		self.uiESHostLine = JPanel()
 		self.uiESHostLine.setLayout(BoxLayout(self.uiESHostLine, BoxLayout.LINE_AXIS))
@@ -179,7 +189,7 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
 		self.uiESHost = JTextField(40)
 		self.uiESHost.setMaximumSize(self.uiESHost.getPreferredSize())
 		self.uiESHostLine.add(self.uiESHost)
-		self.panel.add(self.uiESHostLine)
+		self.panelBasic.add(self.uiESHostLine)
 
 		self.uiESIndexLine = JPanel()
 		self.uiESIndexLine.setLayout(BoxLayout(self.uiESIndexLine, BoxLayout.LINE_AXIS))
@@ -188,7 +198,7 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
 		self.uiESIndex = JTextField(40)
 		self.uiESIndex.setMaximumSize(self.uiESIndex.getPreferredSize())
 		self.uiESIndexLine.add(self.uiESIndex)
-		self.panel.add(self.uiESIndexLine)
+		self.panelBasic.add(self.uiESIndexLine)
 
 		uiToolsLine = JPanel()
 		uiToolsLine.setLayout(BoxLayout(uiToolsLine, BoxLayout.LINE_AXIS))
@@ -223,32 +233,32 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
 		self.uiRedis = JCheckBox("Redis Cache")
 		self.uiRedis.setSelected(True)
 		uiToolsLine.add(self.uiRedis)
-		self.panel.add(uiToolsLine)
-		self.panel.add(Box.createRigidArea(Dimension(0, 10)))
+		self.panelBasic.add(uiToolsLine)
+		self.panelBasic.add(Box.createRigidArea(Dimension(0, 10)))
 
 		uiOptionsLine = JPanel()
 		uiOptionsLine.setLayout(BoxLayout(uiOptionsLine, BoxLayout.LINE_AXIS))
 		uiOptionsLine.setAlignmentX(JPanel.LEFT_ALIGNMENT)
 		self.uiCBOptRespOnly = JCheckBox("Process only responses (include requests)")
 		uiOptionsLine.add(self.uiCBOptRespOnly)
-		self.panel.add(uiOptionsLine)
-		self.panel.add(Box.createRigidArea(Dimension(0, 10)))
+		self.panelBasic.add(uiOptionsLine)
+		self.panelBasic.add(Box.createRigidArea(Dimension(0, 10)))
 
 		uiButtonsLine = JPanel()
 		uiButtonsLine.setLayout(BoxLayout(uiButtonsLine, BoxLayout.LINE_AXIS))
 		uiButtonsLine.setAlignmentX(JPanel.LEFT_ALIGNMENT)
 		uiButtonsLine.add(JButton("Apply", actionPerformed=self.applyConfigUI))
 		uiButtonsLine.add(JButton("Reset", actionPerformed=self.resetConfigUI))
-		self.panel.add(uiButtonsLine)
+		self.panelBasic.add(uiButtonsLine)
 		self.resetConfigUI(None)
 
-		#-----------Generate Request from Hash Function GUI-------------
+		#-----------Generate Request from Hash Function GUI--------------------
 
 		self.uiLogLine = JPanel()
 		self.uiLogLine.setLayout(BoxLayout(self.uiLogLine, BoxLayout.LINE_AXIS))
 		self.uiLogLine.setAlignmentX(JPanel.LEFT_ALIGNMENT)
 		self.uiLogLine.add(JLabel("Gen request from Hash"))
-		self.panel.add(self.uiLogLine)
+		self.panelBasic.add(self.uiLogLine)
 
 		self.uiHashGen = JPanel()
 		self.uiHashGen.setLayout(BoxLayout(self.uiHashGen, BoxLayout.LINE_AXIS))
@@ -258,7 +268,7 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
 		self.uiHashGen.add(self.uiHashVal)
 		self.uiHashGen.add(JButton("Get", actionPerformed=self.hashGetConfigUI))
 		self.uiHashGen.add(JButton("Send to Repeater", actionPerformed=self.sendRequestRepeaterConfigUI))
-		self.panel.add(self.uiHashGen)
+		self.panelBasic.add(self.uiHashGen)
 
 
 		self.uiOutLine = JPanel()
@@ -272,9 +282,52 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
 		self.uiOutReq.setLineWrap(True)
 		self.uiOutReqSP.setViewportView(self.uiOutReq)
 		self.uiOutLine.add(self.uiOutReqSP)
-		self.panel.add(self.uiOutLine)
+		self.panelBasic.add(self.uiOutLine)
+		#---------------------------------------------------------------------
+		#---------------------------------------------------------------------
+		#------------------------Advanced Search Feature----------------------
 
-		return self.panel
+		self.panelAvSearch.setLayout(BoxLayout(self.panelAvSearch, BoxLayout.PAGE_AXIS))
+
+		self.uiASInput = JPanel()
+		self.uiASInput.setLayout(BoxLayout(self.uiASInput, BoxLayout.LINE_AXIS))
+		self.uiASInput.setAlignmentX(JPanel.CENTER_ALIGNMENT)
+		self.uiASValue = JTextField(100)
+		self.uiASValue.setMaximumSize(self.uiASValue.getPreferredSize())
+		self.uiASInput.add(self.uiASValue)
+		self.uiASInput.add(JButton("Query", actionPerformed=self.hashGetConfigUI))
+		self.panelAvSearch.add(self.uiASInput)
+
+		asOutData = [
+			[1,"GET", "www.example.com", "/robots.txt", "200"],
+			[2, "GET", "www.example.com", "/lmao", "404"],
+		]
+		asOutHead = ["#", "Method", "Host", "Path", "Code"]
+		self.uiASOutputTbl = IssueTable(asOutData, asOutHead)
+		tableWidth = self.uiASOutputTbl.getPreferredSize().width 
+		sizeCol1 = int(round(tableWidth / 50 * 1))
+		sizeCol2 = int(round(tableWidth / 50 * 2))
+		sizeCol3 = int(round(tableWidth / 50 * 30))  
+		self.uiASOutputTbl.getColumn("#").setPreferredWidth(sizeCol1)
+		self.uiASOutputTbl.getColumn("Method").setPreferredWidth(sizeCol2)
+		self.uiASOutputTbl.getColumn("Host").setPreferredWidth(sizeCol3)
+		self.uiASOutputTbl.getColumn("Path").setPreferredWidth(sizeCol3)
+		self.uiASOutputTbl.getColumn("Code").setPreferredWidth(sizeCol2)
+		self.uiASOutputJP = JScrollPane()
+		self.uiASOutputJP.setViewportView(self.uiASOutputTbl)
+		self.panelAvSearch.add(self.uiASOutputJP)
+
+		self._splitpane = JSplitPane(JSplitPane.HORIZONTAL_SPLIT)
+		self._requestViewer = self.callbacks.createMessageEditor(self, False)
+		self._responseViewer = self.callbacks.createMessageEditor(self, False)
+		self._splitpane.setLeftComponent(self._requestViewer.getComponent())
+		self._splitpane.setRightComponent(self._responseViewer.getComponent())
+		self.panelAvSearch.add(self._splitpane)
+
+		#---------------------------------------------------------------------
+		self.tabIssue.addTab("Push & Get", self.panelBasic)
+		self.tabIssue.addTab("Advanced Search", self.panelAvSearch)
+		return self.tabIssue
 
 	def checkHash(self,hashes):
 		check = self.redis.get(hashes)
@@ -331,7 +384,7 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
 				progress.setProgress(i)
 			success, failed = bulk(self.es, docs, True, raise_on_error=False)
 			progress.close()
-			JOptionPane.showMessageDialog(self.panel, "<html><p style='width: 300px'>Successful imported %d messages, %d messages failed.</p></html>" % (success, failed), "Finished", JOptionPane.INFORMATION_MESSAGE)
+			JOptionPane.showMessageDialog(self.panelBasic, "<html><p style='width: 300px'>Successful imported %d messages, %d messages failed.</p></html>" % (success, failed), "Finished", JOptionPane.INFORMATION_MESSAGE)
 		return menuAddToES
 
 	### Interface to ElasticSearch ###
