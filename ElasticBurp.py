@@ -37,6 +37,7 @@ import socket
 import threading
 import base64
 import getRequestFromHash
+import SearchBuilder
 import sys
 import array
 from OutputTable import IssueTable
@@ -57,6 +58,7 @@ Burp_onlyResponses = True       # Usually what you want, responses also contain 
 #########################################
 
 class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, IMessageEditorController, ITab):
+
 	def registerExtenderCallbacks(self, callbacks):
 		self.callbacks = callbacks
 		self.helpers = callbacks.getHelpers()
@@ -69,6 +71,8 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, IMessageEd
 		self.confESIndex = self.callbacks.loadExtensionSetting("elasticburp.index") or ES_index
 		self.confBurpTools = int(self.callbacks.loadExtensionSetting("elasticburp.tools") or Burp_Tools)
 		self.confRedis = False
+		self.AS_requestViewer = self.callbacks.createMessageEditor(self, False)
+		self.AS_responseViewer = self.callbacks.createMessageEditor(self, False)
 		saved_onlyresp = self.callbacks.loadExtensionSetting("elasticburp.onlyresp") 
 		if saved_onlyresp == "True":
 			self.confBurpOnlyResp = True
@@ -135,7 +139,20 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, IMessageEd
 		self.callbacks.sendToRepeater(host, port, secure, req, "ElasticBurp-NG")
 
 	def queryASConfig(self):
-		print("haha")
+		tableModel = self.uiASOutputTbl.getModel()
+		query = self.uiASValue.getText()
+		query.strip()
+		esServer = "http://" + self.confESHost + ":9200"
+		esIndex = self.confESIndex
+		try:
+			result = SearchBuilder.getReqFromAS(esServer, esIndex, query)
+			if len(result) == 0:
+				print("No result")
+			else:
+				for i in range(0,len(result)):
+					tableModel.addRow(result[i])
+		except:
+			print("No result")
 
 	### ITab ###
 	def getTabCaption(self):
@@ -171,6 +188,9 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, IMessageEd
 		self.sendRequestRepeaterConfig()
 
 	def queryASConfigUI(self, event):
+		tableModel = self.uiASOutputTbl.getModel()
+		while tableModel.getRowCount() > 0:
+			tableModel.removeRow(0)
 		self.queryASConfig()
 
 	def getUiComponent(self):
@@ -280,6 +300,8 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, IMessageEd
 		menu.add(JMenuItem("Send To Repeater",actionPerformed=self.sendRequestRepeaterConfigUI))
 		self.uiOutReq.componentPopupMenu=menu
 		self.uiOutReq.setLineWrap(True)
+		self.uiOutReq.setWrapStyleWord(True)
+		self.uiOutReq.editable = False
 		self.uiOutReqSP.setViewportView(self.uiOutReq)
 		self.uiOutLine.add(self.uiOutReqSP)
 		self.panelBasic.add(self.uiOutLine)
@@ -295,7 +317,7 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, IMessageEd
 		self.uiASValue = JTextField(100)
 		self.uiASValue.setMaximumSize(self.uiASValue.getPreferredSize())
 		self.uiASInput.add(self.uiASValue)
-		self.uiASInput.add(JButton("Query", actionPerformed=self.hashGetConfigUI))
+		self.uiASInput.add(JButton("Query", actionPerformed=self.queryASConfigUI))
 		self.panelAvSearch.add(self.uiASInput)
 
 		asOutData = [
@@ -303,30 +325,33 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, IMessageEd
 			[2, "GET", "www.example.com", "/lmao", "404"],
 		]
 		asOutHead = ["#", "Method", "Host", "Path", "Code"]
-		self.uiASOutputTbl = IssueTable(asOutData, asOutHead)
+		self.uiASOutputTbl = IssueTable(asOutData, asOutHead, self.AS_requestViewer, self.AS_responseViewer)
 		tableWidth = self.uiASOutputTbl.getPreferredSize().width 
-		sizeCol1 = int(round(tableWidth / 50 * 1))
-		sizeCol2 = int(round(tableWidth / 50 * 2))
-		sizeCol3 = int(round(tableWidth / 50 * 30))  
+		sizeCol1 = int(round(tableWidth / 50 * 5))
+		sizeCol2 = int(round(tableWidth / 50 * 8))
+		sizeCol3 = int(round(tableWidth / 50 * 10))
+		sizeCol4 = int(round(tableWidth / 50 * 25))  
 		self.uiASOutputTbl.getColumn("#").setPreferredWidth(sizeCol1)
-		self.uiASOutputTbl.getColumn("Method").setPreferredWidth(sizeCol2)
-		self.uiASOutputTbl.getColumn("Host").setPreferredWidth(sizeCol3)
-		self.uiASOutputTbl.getColumn("Path").setPreferredWidth(sizeCol3)
-		self.uiASOutputTbl.getColumn("Code").setPreferredWidth(sizeCol2)
+		self.uiASOutputTbl.getColumn("#").setMaxWidth(sizeCol3)
+		self.uiASOutputTbl.getColumn("Method").setMinWidth(sizeCol3)
+		self.uiASOutputTbl.getColumn("Method").setMaxWidth(sizeCol3)
+		self.uiASOutputTbl.getColumn("Host").setPreferredWidth(sizeCol4)
+		self.uiASOutputTbl.getColumn("Path").setPreferredWidth(sizeCol4)
+		self.uiASOutputTbl.getColumn("Code").setMinWidth(sizeCol2)
+		self.uiASOutputTbl.getColumn("Code").setMaxWidth(sizeCol2)
 		requestTable = JPanel()
+		requestTable.setLayout(BoxLayout(requestTable, BoxLayout.LINE_AXIS))
 		self.uiASOutputJP = JScrollPane()
 		self.uiASOutputJP.setViewportView(self.uiASOutputTbl)
 		requestTable.add(self.uiASOutputJP)
 		self.panelAvSearch.add(requestTable)
+
 		requestResponse =JPanel()
-		requestTable.setLayout(BoxLayout(requestTable, BoxLayout.PAGE_AXIS))
-		self._splitpane = JSplitPane(JSplitPane.HORIZONTAL_SPLIT)
-		self._requestViewer = self.callbacks.createMessageEditor(self, False)
-		self._responseViewer = self.callbacks.createMessageEditor(self, False)
-		self._splitpane.setLeftComponent(self._requestViewer.getComponent())
-		self._splitpane.setRightComponent(self._responseViewer.getComponent())
-		self._splitpane.setResizeWeight(0.5)
 		requestResponse.setLayout(BoxLayout(requestResponse, BoxLayout.LINE_AXIS))
+		self._splitpane = JSplitPane(JSplitPane.HORIZONTAL_SPLIT)
+		self._splitpane.setLeftComponent(self.AS_requestViewer.getComponent())
+		self._splitpane.setRightComponent(self.AS_responseViewer.getComponent())
+		self._splitpane.setResizeWeight(0.5)
 		requestResponse.add(self._splitpane)
 		self.panelAvSearch.add(requestResponse)
 
