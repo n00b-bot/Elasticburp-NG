@@ -382,6 +382,7 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, IMessageEd
 		
 		doc = self.genESDoc(msg)
 		doc.request.asBase64= base64.b64encode(bytearray(msg.getRequest()).decode('utf-8'))
+		doc.response.asBase64 = base64.b64encode(bytearray(msg.getResponse()).decode('utf-8'))
 		doc.hashes=hashlib.md5(bytearray(msg.getRequest()).decode('utf-8')).hexdigest()
 		t1=threading.Thread(target=doc.save, args=())
 		if self.confRedis:

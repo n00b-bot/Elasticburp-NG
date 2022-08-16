@@ -96,6 +96,7 @@ class DocHTTPRequestResponse(Document):
                         }
                     ),
                 'body': Text(),
+                'asBase64':Keyword(),
                 'Document': Text(multi=True, fields={'keyword': Keyword()}),
                 'base': Text(multi=True, fields={'keyword': Keyword()}),
                 'stylesheets': Text(multi=True, fields={'keyword': Keyword()}),
