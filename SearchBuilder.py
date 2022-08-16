@@ -1,6 +1,5 @@
 import json, requests
 import re
-import base64
 
 def getReqFromAS(esServer, esIndex, query):
 	url = esServer + "/" + esIndex + "/_search/?q="
@@ -16,11 +15,15 @@ def getReqFromAS(esServer, esIndex, query):
 			get_path = res_dict.get('hits').get('hits')[i].get('_source').get('request').get('requestline')
 			path = get_path.split(" ")[1]
 			status_code = res_dict.get('hits').get('hits')[i].get('_source').get('response').get('status')
+			reqAsBase64 = res_dict.get('hits').get('hits')[i].get('_source').get('request').get('asBase64')
+			resAsBase64 = res_dict.get('hits').get('hits')[i].get('_source').get('response').get('asBase64')
 			unit.append(i+1)
 			unit.append(method)
 			unit.append(host)
 			unit.append(path)
 			unit.append(status_code)
+			unit.append(reqAsBase64)
+			unit.append(resAsBase64)
 			data.append(unit)
 		return data
 	except:

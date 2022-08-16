@@ -1,7 +1,7 @@
 from javax.swing import JTable
 from javax.swing.table import DefaultTableModel
 from java.awt.event import MouseListener
-
+import base64
 
 class IssueTableModel(DefaultTableModel):
 	def __init__(self, data, headings):
@@ -12,7 +12,7 @@ class IssueTableModel(DefaultTableModel):
 		"""Returns True if cells are editable."""
 		# make all rows and columns uneditable.
 		# do we need to check the column value here?
-		canEdit = [False, False, False, False, False]
+		canEdit = [False, False, False, False, False, False, False]
 		return canEdit[column]
 		# return False
 
@@ -21,7 +21,7 @@ class IssueTableModel(DefaultTableModel):
 		from java.lang import Integer, String, Object
 		# return Object if you don't know the type.
 		# only works if we are not changing the number of columns
-		columnClasses = [Integer, String, String, String, String]
+		columnClasses = [Integer, String, String, String, String, String, String]
 		return columnClasses[column]
 
 
@@ -59,7 +59,10 @@ class IssueTableMouseListener(MouseListener):
 	def mouseClicked(self, event):
 		if event.getClickCount() == 1:
 			rowData = self.getClickedRow(event)
-			self.AS_requestViewer.setMessage("Test", True)
+			reqb64 = base64.b64decode(rowData[5])
+			resb64 = base64.b64decode(rowData[6])
+			self.AS_requestViewer.setMessage(reqb64, True)
+			self.AS_responseViewer.setMessage(resb64, False)
 
 	def mouseEntered(self, event):
 		pass

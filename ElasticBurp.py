@@ -321,12 +321,13 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, IMessageEd
 		self.panelAvSearch.add(self.uiASInput)
 
 		asOutData = [
-			[1,"GET", "www.example.com", "/robots.txt", "200"],
-			[2, "GET", "www.example.com", "/lmao", "404"],
+			[1,"GET", "www.example.com", "/robots.txt", "200", "MTIzMzIx", "MTIzMzIx"],
+			[2, "GET", "www.example.com", "/lmao", "404", "MTIzMzIx", "MTIzMzIx"],
 		]
-		asOutHead = ["#", "Method", "Host", "Path", "Code"]
+		asOutHead = ["#", "Method", "Host", "Path", "Code", "Req", "Res"]
 		self.uiASOutputTbl = IssueTable(asOutData, asOutHead, self.AS_requestViewer, self.AS_responseViewer)
 		tableWidth = self.uiASOutputTbl.getPreferredSize().width 
+		sizeCol0 = int(round(tableWidth / 50 * 1))
 		sizeCol1 = int(round(tableWidth / 50 * 5))
 		sizeCol2 = int(round(tableWidth / 50 * 8))
 		sizeCol3 = int(round(tableWidth / 50 * 10))
@@ -339,6 +340,8 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, IMessageEd
 		self.uiASOutputTbl.getColumn("Path").setPreferredWidth(sizeCol4)
 		self.uiASOutputTbl.getColumn("Code").setMinWidth(sizeCol2)
 		self.uiASOutputTbl.getColumn("Code").setMaxWidth(sizeCol2)
+		self.uiASOutputTbl.getColumn("Req").setMaxWidth(sizeCol0)
+		self.uiASOutputTbl.getColumn("Res").setMaxWidth(sizeCol0)
 		requestTable = JPanel()
 		requestTable.setLayout(BoxLayout(requestTable, BoxLayout.LINE_AXIS))
 		self.uiASOutputJP = JScrollPane()
