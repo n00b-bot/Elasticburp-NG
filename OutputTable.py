@@ -10,17 +10,13 @@ class IssueTableModel(DefaultTableModel):
 
 	def isCellEditable(self, row, column):
 		"""Returns True if cells are editable."""
-		# make all rows and columns uneditable.
-		# do we need to check the column value here?
 		canEdit = [False, False, False, False, False, False, False]
 		return canEdit[column]
-		# return False
 
 	def getColumnClass(self, column):
 		"""Returns the column data class. Optional in this case."""
 		from java.lang import Integer, String, Object
 		# return Object if you don't know the type.
-		# only works if we are not changing the number of columns
 		columnClasses = [Integer, String, String, String, String, String, String]
 		return columnClasses[column]
 
@@ -48,14 +44,11 @@ class IssueTableMouseListener(MouseListener):
 		return tbl.getModel().getDataVector().elementAt(tbl.convertRowIndexToModel(tbl.getSelectedRow()))
 
 	def mousePressed(self, event):
-		# print "mouse pressed", event.getClickCount()
 		pass
 
 	def mouseReleased(self, event):
-		# print "mouse released", event.getClickCount()
 		pass
 
-	# event.getClickCount() returns the number of clicks.
 	def mouseClicked(self, event):
 		if event.getClickCount() == 1:
 			rowData = self.getClickedRow(event)
