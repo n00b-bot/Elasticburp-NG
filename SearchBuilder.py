@@ -1,10 +1,21 @@
 import json, requests
 import re
+from elasticsearch import Elasticsearch
+import urllib
+import json
+def getRawFromApi(kibanaServer,query):
+	return requests.get(kibanaServer+"/api/query/gen?query="+urllib.quote(query)).text
 
-def getReqFromAS(esServer, esIndex, query):
-	url = esServer + "/" + esIndex + "/_search/?q="
-	res = requests.get(url+str(query))
+
+def getReqFromAS(kibanaServer,esServer, esIndex, query):
+	raw= getRawFromApi(kibanaServer,query)
+	header = {"Content-Type":"application/json"}
+	a = requests.post(esServer+"/"+esIndex+"/_search",headers=header,data=raw)
+	b = a.json()
+	total=b.get('hits').get("total").get("value")
+	res = requests.post(esServer+"/"+esIndex+"/_search?size="+str(total),headers=header,data=raw)
 	try:
+		
 		res_dict = res.json()
 		res_len = len(res_dict.get('hits').get('hits'))
 		data = []
@@ -26,5 +37,6 @@ def getReqFromAS(esServer, esIndex, query):
 			unit.append(resAsBase64)
 			data.append(unit)
 		return data
-	except:
+	except Exception as e:
+		print(e)
 		return "Error"

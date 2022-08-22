@@ -10,7 +10,7 @@ class getRequestComponent():
 		self.port = port
 		self.pro = pro	
 # Python dictionary object representing an Elasticsearch JSON query:
-#def getReqFromHash(hash):
+#def e(hash):
 def getReqFromHash(esServer, esIndex, hash):
 	elastic_client = Elasticsearch(str(esServer))
 	search_param = {"track_total_hits": False,"sort":[{"timestamp":{"order": "desc","unmapped_type": "boolean"}}],"fields":[{"field": "*","include_unmapped": "true"},{"field":"response.cookies.expiration","format": "strict_date_optional_time"},{"field": "timestamp","format": "strict_date_optional_time"}],"size": 1,"version": True,"script_fields": {},"stored_fields": ["*"],"runtime_mappings": {},"_source": False,"query": {"bool": {"must": [],"filter": [{"match_phrase": {"hashes": "0"}}],"should": [],"must_not": []}},"highlight": {"pre_tags": ["@kibana-highlighted-field@"],"post_tags": ["@/kibana-highlighted-field@"],"fields": {"*": {}},"fragment_size": 2147483647}}

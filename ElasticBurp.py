@@ -143,14 +143,16 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, IMessageEd
 		query.strip()
 		esServer = "http://" + self.confESHost + ":9200"
 		esIndex = self.confESIndex
+		kibanaServer = "http://" + self.confESHost + ":5601"
 		try:
-			result = SearchBuilder.getReqFromAS(esServer, esIndex, query)
+			result = SearchBuilder.getReqFromAS(kibanaServer,esServer, esIndex, query)
 			if len(result) == 0:
 				print("No result")
 			else:
 				for i in range(0,len(result)):
 					tableModel.addRow(result[i])
-		except:
+		except Exception as e:
+			print(e)
 			print("No result")
 
 	### ITab ###
