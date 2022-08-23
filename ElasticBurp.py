@@ -19,8 +19,10 @@ from javax.swing import JMenuItem, ProgressMonitor, JPanel, BoxLayout, JLabel, J
 from java.awt import Dimension, Color
 from java.awt.event import MouseListener
 from elasticsearch_dsl.connections import connections
+from javax.swing.table import AbstractTableModel
 from elasticsearch_dsl import Index
 from elasticsearch.helpers import bulk
+from java.util import ArrayList
 from doc_HttpRequestResponse import DocHTTPRequestResponse
 from datetime import datetime
 from email.utils import parsedate_tz, mktime_tz
@@ -44,6 +46,7 @@ from OutputTable import IssueTable
 
 reload(sys)  
 sys.setdefaultencoding('utf-8')
+sys.setrecursionlimit(200)
 try:
 	tz = get_localzone()
 except:
@@ -79,11 +82,17 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, IMessageEd
 			self.confBurpOnlyResp = False
 		else:
 			self.confBurpOnlyResp = bool(int(saved_onlyresp or Burp_onlyResponses))
-
+		self._searchTable = ArrayList()
 		self.callbacks.addSuiteTab(self)
 		self.applyConfig()
 
-
+	def getHttpService(self):
+		return self._currentDisplay.getHttpService()
+	def getRequest(self):
+		return self._currentDisplay.getRequest()
+	def getResponse(self):
+		return self._currentDisplay.getResponse()
+	
 	def applyConfig(self):
 		try:
 			print("Connecting to '%s', index '%s'" % (self.confESHost, self.confESIndex))
@@ -145,14 +154,14 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, IMessageEd
 		esIndex = self.confESIndex
 		kibanaServer = "http://" + self.confESHost + ":5601"
 		try:
-			result = SearchBuilder.getReqFromAS(kibanaServer,esServer, esIndex, query)
-			if len(result) == 0:
+			result = SearchBuilder.getReqFromAS(self,kibanaServer,esServer, esIndex, query)
+			if result == "Error":
 				print("No result")
 			else:
 				for i in range(0,len(result)):
 					tableModel.addRow(result[i])
 		except Exception as e:
-			print(e)
+			print(traceback.format_exc())
 			print("No result")
 
 	### ITab ###
@@ -326,7 +335,7 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, IMessageEd
 			[2, "GET", "www.example.com", "/lmao", "404", "MTIzMzIx", "dGVzdA=="],
 		]
 		asOutHead = ["#", "Method", "Host", "Path", "Code", "Req", "Res"]
-		self.uiASOutputTbl = IssueTable(asOutData, asOutHead, self.AS_requestViewer, self.AS_responseViewer)
+		self.uiASOutputTbl = IssueTable(asOutData, asOutHead, self)
 		tableWidth = self.uiASOutputTbl.getPreferredSize().width 
 		sizeCol0 = int(round(tableWidth / 50 * 1))
 		sizeCol1 = int(round(tableWidth / 50 * 5))
@@ -442,6 +451,7 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, IMessageEd
 				try:
 					doc.add_request_header(header)
 				except:
+					
 					doc.request.requestline = header
 
 			parameters = iRequest.getParameters()

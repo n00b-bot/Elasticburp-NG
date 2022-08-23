@@ -67,13 +67,29 @@ class IssueTableMouseListener(MouseListener):
 class IssueTable(JTable):
 	"""Issue table."""
 
-	def __init__(self, data, headers, AS_requestViewer, AS_responseViewer):
-
+	def __init__(self, data, headers, extender):
+		self._extender = extender
+		self.AS_requestViewer=extender.AS_requestViewer
+		self.AS_responseViewer=extender.AS_responseViewer
 		# set the table model
 		model = IssueTableModel(data, headers)
 		self.setModel(model)
 		self.setAutoCreateRowSorter(True)
+		#self.getSelectionModel().addListSelectionListener(self.nothing)
 		# disable the reordering of columns
 		self.getTableHeader().setReorderingAllowed(False)
 		# assign panel to a field
-		self.addMouseListener(IssueTableMouseListener(AS_requestViewer, AS_responseViewer))
+		self.addMouseListener(IssueTableMouseListener(extender.AS_requestViewer, extender.AS_responseViewer))
+	def changeSelection(self, row, col, toggle, extend):
+		log = self._extender._searchTable.get(row)
+		self._extender.AS_requestViewer.setMessage(log.getRequest(),False)
+		self._extender.AS_responseViewer.setMessage(log.getResponse(),False)
+		self._extender._currentDisplay = log
+		JTable.changeSelection(self, row, col, toggle, extend)
+	# def nothing(self,event):
+	# 	rowData =self.getModel().getDataVector().elementAt(self.convertRowIndexToModel(self.getSelectedRow()))
+		
+	# 	reqb64 = base64.b64decode(rowData[5])
+	#  	resb64 = base64.b64decode(rowData[6])
+	# 	self.AS_requestViewer.setMessage(reqb64, True)
+	# 	self.AS_responseViewer.setMessage(resb64, False)
