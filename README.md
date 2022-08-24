@@ -26,5 +26,5 @@ Redis [3.0.504](https://github.com/microsoftarchive/redis/releases/tag/win-3.0.5
 
 - [x] Reduce duplicated requests with redis.
 - [x] Requests Sharing.
-- [ ] Adding Advanced Search
+- [x] Adding Advanced Search
 - [ ] Reduce missing requests from ConnectionTimeout
