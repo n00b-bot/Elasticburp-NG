@@ -1,8 +1,5 @@
-import json, requests
-import re
-from elasticsearch import Elasticsearch
+import requests
 import urllib
-import json
 import base64
 from burp import IHttpService,IMessageEditorController
 import traceback
@@ -16,7 +13,6 @@ class service(IHttpService):
 		self.port1 = port1
 		self.protocol1 = protocol1
 	def getHost(self):
-		print(dir(self))
 		return self.host1
 	def getPort(self):
 		return self.port1
@@ -43,13 +39,12 @@ class requestResponse(IMessageEditorController):
 def getReqFromAS(self,kibanaServer,esServer, esIndex, query):
 	raw= getRawFromApi(kibanaServer,query)
 	header = {"Content-Type":"application/json"}
-	a = requests.post(esServer+"/"+esIndex+"/_search",headers=header,data=raw)
-	b = a.json()
+	resp = requests.post(esServer+"/"+esIndex+"/_search",headers=header,data=raw)
+	b = resp.json()
 	self._searchTable.clear()
-	total=b.get('hits').get("total").get("value")
-	res = requests.post(esServer+"/"+esIndex+"/_search?size="+str(total),headers=header,data=raw)
 	try:
-		
+		total=b.get('hits').get("total").get("value")
+		res = requests.post(esServer+"/"+esIndex+"/_search?size="+str(total),headers=header,data=raw)
 		res_dict = res.json()
 		res_len = len(res_dict.get('hits').get('hits'))
 		data = []
@@ -77,5 +72,4 @@ def getReqFromAS(self,kibanaServer,esServer, esIndex, query):
 			data.append(unit)
 		return data
 	except Exception as e:
-		print(traceback.format_exc())
-		return "Error"
+		raise Exception("Not Found")

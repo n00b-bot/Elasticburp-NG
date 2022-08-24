@@ -16,10 +16,9 @@
  
 from burp import IBurpExtender, IBurpExtenderCallbacks, IHttpListener, IRequestInfo, IParameter, IContextMenuFactory, ITab, IMessageEditorController
 from javax.swing import JMenuItem, ProgressMonitor, JPanel, BoxLayout, JLabel, JTextField, JCheckBox, JButton, Box, JOptionPane, JTextArea, JScrollPane, JTable, table, JPopupMenu, JTabbedPane, JSplitPane
-from java.awt import Dimension, Color
+from java.awt import Dimension, Color,BorderLayout
 from java.awt.event import MouseListener
 from elasticsearch_dsl.connections import connections
-from javax.swing.table import AbstractTableModel
 from elasticsearch_dsl import Index
 from elasticsearch.helpers import bulk
 from java.util import ArrayList
@@ -30,9 +29,7 @@ from tzlocal import get_localzone
 import hashlib
 import re
 import redis
-from pprint import pprint
 import traceback
-import time
 from redis import connection
 import errno
 import socket
@@ -155,14 +152,10 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, IMessageEd
 		kibanaServer = "http://" + self.confESHost + ":5601"
 		try:
 			result = SearchBuilder.getReqFromAS(self,kibanaServer,esServer, esIndex, query)
-			if result == "Error":
-				print("No result")
-			else:
-				for i in range(0,len(result)):
-					tableModel.addRow(result[i])
+			for i in range(0,len(result)):
+				tableModel.addRow(result[i])
 		except Exception as e:
-			print(traceback.format_exc())
-			print("No result")
+			JOptionPane.showMessageDialog(self.panelBasic, "<html><p style='width: 300px'>%s</p></html>" % (str(e)), "Error", JOptionPane.ERROR_MESSAGE)
 
 	### ITab ###
 	def getTabCaption(self):
@@ -318,18 +311,23 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, IMessageEd
 		#---------------------------------------------------------------------
 		#---------------------------------------------------------------------
 		#------------------------Advanced Search Feature----------------------
+		table = JSplitPane(JSplitPane.VERTICAL_SPLIT)
+		top = JSplitPane(JSplitPane.VERTICAL_SPLIT)
+		
+		"""Disable Resize"""
+		top.setDividerSize(0)
 
-		self.panelAvSearch.setLayout(BoxLayout(self.panelAvSearch, BoxLayout.PAGE_AXIS))
+		self.panelAvSearch.setLayout(BoxLayout(self.panelAvSearch, BoxLayout.Y_AXIS))
 
 		self.uiASInput = JPanel()
-		self.uiASInput.setLayout(BoxLayout(self.uiASInput, BoxLayout.LINE_AXIS))
+		self.uiASInput.setLayout(BoxLayout(self.uiASInput, BoxLayout.X_AXIS))
 		self.uiASInput.setAlignmentX(JPanel.CENTER_ALIGNMENT)
-		self.uiASValue = JTextField(100)
+		self.uiASValue = JTextField(100,actionPerformed=self.queryASConfigUI)
 		self.uiASValue.setMaximumSize(self.uiASValue.getPreferredSize())
 		self.uiASInput.add(self.uiASValue)
 		self.uiASInput.add(JButton("Query", actionPerformed=self.queryASConfigUI))
-		self.panelAvSearch.add(self.uiASInput)
-
+		#self.panelAvSearch.add()
+		top.setLeftComponent(self.uiASInput)
 		asOutData = [
 			[1,"GET", "www.example.com", "/robots.txt", "200", "dGVzdA==", "MTIzMzIx"],
 			[2, "GET", "www.example.com", "/lmao", "404", "MTIzMzIx", "dGVzdA=="],
@@ -357,17 +355,20 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, IMessageEd
 		self.uiASOutputJP = JScrollPane()
 		self.uiASOutputJP.setViewportView(self.uiASOutputTbl)
 		requestTable.add(self.uiASOutputJP)
-		self.panelAvSearch.add(requestTable)
+		table.setLeftComponent(requestTable)
+
+
 
 		requestResponse =JPanel()
-		requestResponse.setLayout(BoxLayout(requestResponse, BoxLayout.LINE_AXIS))
+		requestResponse.setLayout(BoxLayout(requestResponse, BoxLayout.X_AXIS))
 		self._splitpane = JSplitPane(JSplitPane.HORIZONTAL_SPLIT)
 		self._splitpane.setLeftComponent(self.AS_requestViewer.getComponent())
 		self._splitpane.setRightComponent(self.AS_responseViewer.getComponent())
 		self._splitpane.setResizeWeight(0.5)
 		requestResponse.add(self._splitpane)
-		self.panelAvSearch.add(requestResponse)
-
+		table.setRightComponent(requestResponse)
+		top.setRightComponent(table)
+		self.panelAvSearch.add(top,BorderLayout.CENTER)
 		#---------------------------------------------------------------------
 		self.tabIssue.addTab("Push & Get", self.panelBasic)
 		self.tabIssue.addTab("Advanced Search", self.panelAvSearch)
@@ -447,11 +448,11 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, IMessageEd
 			doc.request.url = iRequest.getUrl().toString()
 
 			headers = iRequest.getHeaders()
+			print(headers)
 			for header in headers:
 				try:
 					doc.add_request_header(header)
 				except:
-					
 					doc.request.requestline = header
 
 			parameters = iRequest.getParameters()

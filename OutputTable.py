@@ -80,6 +80,7 @@ class IssueTable(JTable):
 		self.getTableHeader().setReorderingAllowed(False)
 		# assign panel to a field
 		self.addMouseListener(IssueTableMouseListener(extender.AS_requestViewer, extender.AS_responseViewer))
+		
 	def changeSelection(self, row, col, toggle, extend):
 		log = self._extender._searchTable.get(row)
 		self._extender.AS_requestViewer.setMessage(log.getRequest(),False)
