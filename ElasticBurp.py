@@ -14,13 +14,14 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
  
-from burp import IBurpExtender, IBurpExtenderCallbacks, IHttpListener, IRequestInfo, IParameter, IContextMenuFactory, ITab
-from javax.swing import JMenuItem, ProgressMonitor, JPanel, BoxLayout, JLabel, JTextField, JCheckBox, JButton, Box, JOptionPane, JTextArea, JScrollPane, JTable, table, JPopupMenu
-from java.awt import Dimension, Color
+from burp import IBurpExtender, IBurpExtenderCallbacks, IHttpListener, IRequestInfo, IParameter, IContextMenuFactory, ITab, IMessageEditorController
+from javax.swing import JMenuItem, ProgressMonitor, JPanel, BoxLayout, JLabel, JTextField, JCheckBox, JButton, Box, JOptionPane, JTextArea, JScrollPane, JTable, table, JPopupMenu, JTabbedPane, JSplitPane
+from java.awt import Dimension, Color,BorderLayout
 from java.awt.event import MouseListener
 from elasticsearch_dsl.connections import connections
 from elasticsearch_dsl import Index
 from elasticsearch.helpers import bulk
+from java.util import ArrayList
 from doc_HttpRequestResponse import DocHTTPRequestResponse
 from datetime import datetime
 from email.utils import parsedate_tz, mktime_tz
@@ -28,34 +29,35 @@ from tzlocal import get_localzone
 import hashlib
 import re
 import redis
-from pprint import pprint
 import traceback
-import time
 from redis import connection
 import errno
 import socket
 import threading
 import base64
 import getRequestFromHash
+import SearchBuilder
 import sys
 import array
+from OutputTable import IssueTable
 
 reload(sys)  
 sys.setdefaultencoding('utf-8')
+sys.setrecursionlimit(200)
 try:
 	tz = get_localzone()
 except:
 	tz = None
 reDateHeader = re.compile("^Date:\s*(.*)$", flags=re.IGNORECASE)
 
-### Config (TODO: move to config tab) ###
 ES_host = "localhost"
 ES_index = "wase-thread"
 Burp_Tools = IBurpExtenderCallbacks.TOOL_PROXY
 Burp_onlyResponses = True       # Usually what you want, responses also contain requests
 #########################################
 
-class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
+class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, IMessageEditorController, ITab):
+
 	def registerExtenderCallbacks(self, callbacks):
 		self.callbacks = callbacks
 		self.helpers = callbacks.getHelpers()
@@ -68,6 +70,8 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
 		self.confESIndex = self.callbacks.loadExtensionSetting("elasticburp.index") or ES_index
 		self.confBurpTools = int(self.callbacks.loadExtensionSetting("elasticburp.tools") or Burp_Tools)
 		self.confRedis = False
+		self.AS_requestViewer = self.callbacks.createMessageEditor(self, False)
+		self.AS_responseViewer = self.callbacks.createMessageEditor(self, False)
 		saved_onlyresp = self.callbacks.loadExtensionSetting("elasticburp.onlyresp") 
 		if saved_onlyresp == "True":
 			self.confBurpOnlyResp = True
@@ -75,16 +79,21 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
 			self.confBurpOnlyResp = False
 		else:
 			self.confBurpOnlyResp = bool(int(saved_onlyresp or Burp_onlyResponses))
-
+		self._searchTable = ArrayList()
 		self.callbacks.addSuiteTab(self)
 		self.applyConfig()
 
-
+	def getHttpService(self):
+		return self._currentDisplay.getHttpService()
+	def getRequest(self):
+		return self._currentDisplay.getRequest()
+	def getResponse(self):
+		return self._currentDisplay.getResponse()
+	
 	def applyConfig(self):
 		try:
 			print("Connecting to '%s', index '%s'" % (self.confESHost, self.confESIndex))
 			self.es = connections.create_connection(hosts=[self.confESHost],timeout=20)
-			print("connect elastic search successful")
 			self.idx = Index(self.confESIndex)
 			self.idx.document(DocHTTPRequestResponse)
 			if self.confRedis:
@@ -101,10 +110,9 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
 			self.callbacks.saveExtensionSetting("elasticburp.host", self.confESHost)
 			self.callbacks.saveExtensionSetting("elasticburp.index", self.confESIndex)
 			self.callbacks.saveExtensionSetting("elasticburp.tools", str(self.confBurpTools))
-
 			self.callbacks.saveExtensionSetting("elasticburp.onlyresp", str(int(self.confBurpOnlyResp)))
 		except Exception as e:
-			JOptionPane.showMessageDialog(self.panel, "<html><p style='width: 300px'>Error while initializing ElasticSearch: %s</p></html>" % (str(e)), "Error", JOptionPane.ERROR_MESSAGE)
+			JOptionPane.showMessageDialog(self.panelBasic, "<html><p style='width: 300px'>Error while initializing ElasticSearch: %s</p></html>" % (str(e)), "Error", JOptionPane.ERROR_MESSAGE)
 	
 	def hashGetConfig(self):
 		hash = self.uiHashVal.getText()
@@ -112,16 +120,19 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
 		esServer = "http://" + self.confESHost + ":9200"
 		esIndex = self.confESIndex
 		result = getRequestFromHash.getReqFromHash(esServer, esIndex, hash)
-		if result.req == "empty":
-			self.uiOutReq.setText("Not found")
-		else:
-			if len(result.pro) == 0 and len(result.host) ==  0:
-				print("Error on finding request")
+		try:        
+			if result.req == "empty":
+				self.uiOutReq.setText("Not found")
 			else:
-				self.reqHost = result.host[0]
-				self.proto = result.pro[0]
-				self.reqPort = result.port[0]
-				self.uiOutReq.setText(result.req)
+				if len(result.pro) == 0 and len(result.host) ==  0:
+					self.uiOutReq.setText("Error on finding request")
+				else:
+					self.reqHost = result.host[0]
+					self.proto = result.pro[0]
+					self.reqPort = result.port[0]
+					self.uiOutReq.setText(result.req)
+		except:
+			self.uiOutReq.setText("Can't find " + hash)
 
 	def sendRequestRepeaterConfig(self):
 		reqtext = self.uiOutReq.getText()
@@ -130,11 +141,25 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
 		proto  = str(self.proto)
 		secure = True if proto == "https" else False
 		req = array.array("b",str(reqtext))
-		self.callbacks.sendToRepeater(host, port, secure, req, "ElasticBurp")
+		self.callbacks.sendToRepeater(host, port, secure, req, "ElasticBurp-NG")
+
+	def queryASConfig(self):
+		tableModel = self.uiASOutputTbl.getModel()
+		query = self.uiASValue.getText()
+		query.strip()
+		esServer = "http://" + self.confESHost + ":9200"
+		esIndex = self.confESIndex
+		kibanaServer = "http://" + self.confESHost + ":5601"
+		try:
+			result = SearchBuilder.getReqFromAS(self,kibanaServer,esServer, esIndex, query)
+			for i in range(0,len(result)):
+				tableModel.addRow(result[i])
+		except Exception as e:
+			JOptionPane.showMessageDialog(self.panelBasic, "<html><p style='width: 300px'>%s</p></html>" % (str(e)), "Error", JOptionPane.ERROR_MESSAGE)
 
 	### ITab ###
 	def getTabCaption(self):
-		return "ElasticBurp"
+		return "ElasticBurp-NG"
 
 	def applyConfigUI(self, event):
 		#self.idx.close()
@@ -165,9 +190,20 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
 	def sendRequestRepeaterConfigUI(self, event):
 		self.sendRequestRepeaterConfig()
 
+	def queryASConfigUI(self, event):
+		tableModel = self.uiASOutputTbl.getModel()
+		while tableModel.getRowCount() > 0:
+			tableModel.removeRow(0)
+		self.queryASConfig()
+
 	def getUiComponent(self):
-		self.panel = JPanel()
-		self.panel.setLayout(BoxLayout(self.panel, BoxLayout.PAGE_AXIS))
+		self.panelBasic = JPanel()
+		self.panelAvSearch = JPanel()
+		self.tabIssue = JTabbedPane()
+
+		#---------------------Push and Get Feature----------------------------
+		
+		self.panelBasic.setLayout(BoxLayout(self.panelBasic, BoxLayout.PAGE_AXIS))
 
 		self.uiESHostLine = JPanel()
 		self.uiESHostLine.setLayout(BoxLayout(self.uiESHostLine, BoxLayout.LINE_AXIS))
@@ -176,7 +212,7 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
 		self.uiESHost = JTextField(40)
 		self.uiESHost.setMaximumSize(self.uiESHost.getPreferredSize())
 		self.uiESHostLine.add(self.uiESHost)
-		self.panel.add(self.uiESHostLine)
+		self.panelBasic.add(self.uiESHostLine)
 
 		self.uiESIndexLine = JPanel()
 		self.uiESIndexLine.setLayout(BoxLayout(self.uiESIndexLine, BoxLayout.LINE_AXIS))
@@ -185,7 +221,7 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
 		self.uiESIndex = JTextField(40)
 		self.uiESIndex.setMaximumSize(self.uiESIndex.getPreferredSize())
 		self.uiESIndexLine.add(self.uiESIndex)
-		self.panel.add(self.uiESIndexLine)
+		self.panelBasic.add(self.uiESIndexLine)
 
 		uiToolsLine = JPanel()
 		uiToolsLine.setLayout(BoxLayout(uiToolsLine, BoxLayout.LINE_AXIS))
@@ -218,33 +254,34 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
 		uiToolsLine.add(self.uiCBExtender)
 		uiToolsLine.add(Box.createRigidArea(Dimension(10, 0)))
 		self.uiRedis = JCheckBox("Redis Cache")
+		self.uiRedis.setSelected(True)
 		uiToolsLine.add(self.uiRedis)
-		self.panel.add(uiToolsLine)
-		self.panel.add(Box.createRigidArea(Dimension(0, 10)))
+		self.panelBasic.add(uiToolsLine)
+		self.panelBasic.add(Box.createRigidArea(Dimension(0, 10)))
 
 		uiOptionsLine = JPanel()
 		uiOptionsLine.setLayout(BoxLayout(uiOptionsLine, BoxLayout.LINE_AXIS))
 		uiOptionsLine.setAlignmentX(JPanel.LEFT_ALIGNMENT)
 		self.uiCBOptRespOnly = JCheckBox("Process only responses (include requests)")
 		uiOptionsLine.add(self.uiCBOptRespOnly)
-		self.panel.add(uiOptionsLine)
-		self.panel.add(Box.createRigidArea(Dimension(0, 10)))
+		self.panelBasic.add(uiOptionsLine)
+		self.panelBasic.add(Box.createRigidArea(Dimension(0, 10)))
 
 		uiButtonsLine = JPanel()
 		uiButtonsLine.setLayout(BoxLayout(uiButtonsLine, BoxLayout.LINE_AXIS))
 		uiButtonsLine.setAlignmentX(JPanel.LEFT_ALIGNMENT)
 		uiButtonsLine.add(JButton("Apply", actionPerformed=self.applyConfigUI))
 		uiButtonsLine.add(JButton("Reset", actionPerformed=self.resetConfigUI))
-		self.panel.add(uiButtonsLine)
+		self.panelBasic.add(uiButtonsLine)
 		self.resetConfigUI(None)
 
-		#-----------Generate Request from Hash Function GUI-------------
+		#-----------Generate Request from Hash Function GUI--------------------
 
 		self.uiLogLine = JPanel()
 		self.uiLogLine.setLayout(BoxLayout(self.uiLogLine, BoxLayout.LINE_AXIS))
 		self.uiLogLine.setAlignmentX(JPanel.LEFT_ALIGNMENT)
 		self.uiLogLine.add(JLabel("Gen request from Hash"))
-		self.panel.add(self.uiLogLine)
+		self.panelBasic.add(self.uiLogLine)
 
 		self.uiHashGen = JPanel()
 		self.uiHashGen.setLayout(BoxLayout(self.uiHashGen, BoxLayout.LINE_AXIS))
@@ -254,7 +291,7 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
 		self.uiHashGen.add(self.uiHashVal)
 		self.uiHashGen.add(JButton("Get", actionPerformed=self.hashGetConfigUI))
 		self.uiHashGen.add(JButton("Send to Repeater", actionPerformed=self.sendRequestRepeaterConfigUI))
-		self.panel.add(self.uiHashGen)
+		self.panelBasic.add(self.uiHashGen)
 
 
 		self.uiOutLine = JPanel()
@@ -266,11 +303,76 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
 		menu.add(JMenuItem("Send To Repeater",actionPerformed=self.sendRequestRepeaterConfigUI))
 		self.uiOutReq.componentPopupMenu=menu
 		self.uiOutReq.setLineWrap(True)
+		self.uiOutReq.setWrapStyleWord(True)
+		self.uiOutReq.editable = False
 		self.uiOutReqSP.setViewportView(self.uiOutReq)
 		self.uiOutLine.add(self.uiOutReqSP)
-		self.panel.add(self.uiOutLine)
+		self.panelBasic.add(self.uiOutLine)
+		#---------------------------------------------------------------------
+		#---------------------------------------------------------------------
+		#------------------------Advanced Search Feature----------------------
+		table = JSplitPane(JSplitPane.VERTICAL_SPLIT)
+		top = JSplitPane(JSplitPane.VERTICAL_SPLIT)
+		
+		"""Disable Resize"""
+		top.setDividerSize(0)
 
-		return self.panel
+		self.panelAvSearch.setLayout(BoxLayout(self.panelAvSearch, BoxLayout.Y_AXIS))
+
+		self.uiASInput = JPanel()
+		self.uiASInput.setLayout(BoxLayout(self.uiASInput, BoxLayout.X_AXIS))
+		self.uiASInput.setAlignmentX(JPanel.CENTER_ALIGNMENT)
+		self.uiASValue = JTextField(100,actionPerformed=self.queryASConfigUI)
+		self.uiASValue.setMaximumSize(self.uiASValue.getPreferredSize())
+		self.uiASInput.add(self.uiASValue)
+		self.uiASInput.add(JButton("Query", actionPerformed=self.queryASConfigUI))
+		#self.panelAvSearch.add()
+		top.setLeftComponent(self.uiASInput)
+		asOutData = [
+			[1,"GET", "www.example.com", "/robots.txt", "200", "dGVzdA==", "MTIzMzIx"],
+			[2, "GET", "www.example.com", "/lmao", "404", "MTIzMzIx", "dGVzdA=="],
+		]
+		asOutHead = ["#", "Method", "Host", "Path", "Code", "Req", "Res"]
+		self.uiASOutputTbl = IssueTable(asOutData, asOutHead, self)
+		tableWidth = self.uiASOutputTbl.getPreferredSize().width 
+		sizeCol0 = int(round(tableWidth / 50 * 1))
+		sizeCol1 = int(round(tableWidth / 50 * 5))
+		sizeCol2 = int(round(tableWidth / 50 * 8))
+		sizeCol3 = int(round(tableWidth / 50 * 10))
+		sizeCol4 = int(round(tableWidth / 50 * 25))  
+		self.uiASOutputTbl.getColumn("#").setPreferredWidth(sizeCol1)
+		self.uiASOutputTbl.getColumn("#").setMaxWidth(sizeCol3)
+		self.uiASOutputTbl.getColumn("Method").setMinWidth(sizeCol3)
+		self.uiASOutputTbl.getColumn("Method").setMaxWidth(sizeCol3)
+		self.uiASOutputTbl.getColumn("Host").setPreferredWidth(sizeCol4)
+		self.uiASOutputTbl.getColumn("Path").setPreferredWidth(sizeCol4)
+		self.uiASOutputTbl.getColumn("Code").setMinWidth(sizeCol2)
+		self.uiASOutputTbl.getColumn("Code").setMaxWidth(sizeCol2)
+		self.uiASOutputTbl.removeColumn(self.uiASOutputTbl.getColumnModel().getColumn(5));
+		self.uiASOutputTbl.removeColumn(self.uiASOutputTbl.getColumnModel().getColumn(5));
+		requestTable = JPanel()
+		requestTable.setLayout(BoxLayout(requestTable, BoxLayout.LINE_AXIS))
+		self.uiASOutputJP = JScrollPane()
+		self.uiASOutputJP.setViewportView(self.uiASOutputTbl)
+		requestTable.add(self.uiASOutputJP)
+		table.setLeftComponent(requestTable)
+
+
+
+		requestResponse =JPanel()
+		requestResponse.setLayout(BoxLayout(requestResponse, BoxLayout.X_AXIS))
+		self._splitpane = JSplitPane(JSplitPane.HORIZONTAL_SPLIT)
+		self._splitpane.setLeftComponent(self.AS_requestViewer.getComponent())
+		self._splitpane.setRightComponent(self.AS_responseViewer.getComponent())
+		self._splitpane.setResizeWeight(0.5)
+		requestResponse.add(self._splitpane)
+		table.setRightComponent(requestResponse)
+		top.setRightComponent(table)
+		self.panelAvSearch.add(top,BorderLayout.CENTER)
+		#---------------------------------------------------------------------
+		self.tabIssue.addTab("Push & Get", self.panelBasic)
+		self.tabIssue.addTab("Advanced Search", self.panelAvSearch)
+		return self.tabIssue
 
 	def checkHash(self,hashes):
 		check = self.redis.get(hashes)
@@ -294,6 +396,7 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
 		
 		doc = self.genESDoc(msg)
 		doc.request.asBase64= base64.b64encode(bytearray(msg.getRequest()).decode('utf-8'))
+		doc.response.asBase64 = base64.b64encode(bytearray(msg.getResponse()).decode('utf-8'))
 		doc.hashes=hashlib.md5(bytearray(msg.getRequest()).decode('utf-8')).hexdigest()
 		t1=threading.Thread(target=doc.save, args=())
 		if self.confRedis:
@@ -327,7 +430,7 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
 				progress.setProgress(i)
 			success, failed = bulk(self.es, docs, True, raise_on_error=False)
 			progress.close()
-			JOptionPane.showMessageDialog(self.panel, "<html><p style='width: 300px'>Successful imported %d messages, %d messages failed.</p></html>" % (success, failed), "Finished", JOptionPane.INFORMATION_MESSAGE)
+			JOptionPane.showMessageDialog(self.panelBasic, "<html><p style='width: 300px'>Successful imported %d messages, %d messages failed.</p></html>" % (success, failed), "Finished", JOptionPane.INFORMATION_MESSAGE)
 		return menuAddToES
 
 	### Interface to ElasticSearch ###
@@ -345,6 +448,7 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, ITab):
 			doc.request.url = iRequest.getUrl().toString()
 
 			headers = iRequest.getHeaders()
+			print(headers)
 			for header in headers:
 				try:
 					doc.add_request_header(header)
