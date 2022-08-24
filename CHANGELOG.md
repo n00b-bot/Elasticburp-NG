@@ -1,7 +1,9 @@
 # Change Log
 
-## Dev
-Thanks to https://github.com/Quitten/Autorize 
+## 1.1
+### Added 
+* Add Advanced Search 
+## 1.0
 ### Added
   * Add new property 'asBase64' to make easier for sharing request.
   * Add threading to improve performance.
