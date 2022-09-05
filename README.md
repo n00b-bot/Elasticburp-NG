@@ -34,6 +34,9 @@ https://user-images.githubusercontent.com/97270758/188400426-299f1227-2d4c-42f0-
 7. Enjoy!
 
 # Features
+- Requests Sharing
+
+- Advanced Search
 
 # Demo
 
