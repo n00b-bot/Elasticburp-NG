@@ -40,6 +40,9 @@ Make easier sharing request with your teammate by hash.
 - Advanced Search
 
 Advanced Search using KQL(Kibana Query Language) but you need to install [QueryBuilderApi](https://github.com/n00b-bot/QueryBuilderApi) plugin on Kibana.
+- Reduce duplicated requests
+
+Using Redis to reduce duplicated requests and improve performance
 # Demo
 
 https://user-images.githubusercontent.com/97270758/188403933-6de89bc1-152d-4ef9-b356-28c9f315e826.mp4
@@ -51,7 +54,7 @@ Redis [3.0.504](https://github.com/microsoftarchive/redis/releases/tag/win-3.0.5
 # [Change Log](CHANGELOG.md) 
 # Todo 
 
-- [x] Reduce duplicated requests with redis.
+- [x] Reduce duplicated requests.
 - [x] Requests Sharing.
 - [X] Adding Advanced Search
-- [ ] Reduce missing requests from ConnectionTimeout
+- [ ] Reduce missing requests from ConnectionTimeout.
