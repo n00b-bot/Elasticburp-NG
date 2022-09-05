@@ -36,8 +36,10 @@ https://user-images.githubusercontent.com/97270758/188400426-299f1227-2d4c-42f0-
 # Features
 - Requests Sharing
 
+Make easier sharing request with your teammate by hash.
 - Advanced Search
 
+Advanced Search using KQL(Kibana Query Language) but you need to install [QueryBuilderApi](https://github.com/n00b-bot/QueryBuilderApi) plugin on Kibana.
 # Demo
 
 https://user-images.githubusercontent.com/97270758/188403933-6de89bc1-152d-4ef9-b356-28c9f315e826.mp4
