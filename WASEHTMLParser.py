@@ -4,7 +4,7 @@ if sys.version_info[0] == 2:
 else:
     from html.parser import HTMLParser
 
-# extract values from attrList of attributes whose name is contained in attrNames
+# extract values from attrList of attributes whose name is contained in attrNames 
 def add_attrs(attrNames, attrList):
     return [a[1] for a in filter(lambda attr: attr[0] in attrNames, attrList)]
 

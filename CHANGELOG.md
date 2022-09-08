@@ -11,3 +11,4 @@
 ### Change
   * Change logic parse from 'b' array to string.
   * Change RegEx to manually get value from Elasticsearch query responses.
+
