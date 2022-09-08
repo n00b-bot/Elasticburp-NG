@@ -448,7 +448,6 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory, IMessageEd
 			doc.request.url = iRequest.getUrl().toString()
 
 			headers = iRequest.getHeaders()
-			print(headers)
 			for header in headers:
 				try:
 					doc.add_request_header(header)
