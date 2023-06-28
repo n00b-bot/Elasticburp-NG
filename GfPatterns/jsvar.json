@@ -1,0 +1,4 @@
+{
+"flags": "jsvar",
+  "patterns": ["var [a-z0-9_]+\\=."]
+}

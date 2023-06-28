@@ -1,0 +1,10 @@
+{
+    "flags": "img-traversal",
+     "patterns": [
+
+        "=.*.jpg",
+        "=.*.jpeg",
+        "=.*.gif",
+        "=.*.png"
+]
+}

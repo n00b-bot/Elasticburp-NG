@@ -54,6 +54,7 @@ def getReqFromAS(self,kibanaServer,esServer, esIndex, query):
 			host = res_dict.get('hits').get('hits')[i].get('_source').get('host')
 			port = res_dict.get('hits').get('hits')[i].get('_source').get('port')
 			status_code = res_dict.get('hits').get('hits')[i].get('_source').get('response').get('status')
+			types = res_dict.get('hits').get('hits')[i].get('_source').get('types')
 			reqAsBase64 = res_dict.get('hits').get('hits')[i].get('_source').get('request').get('asBase64')
 			resAsBase64 = res_dict.get('hits').get('hits')[i].get('_source').get('response').get('asBase64')
 			req = base64.b64decode(reqAsBase64).decode("utf-8")
@@ -64,6 +65,7 @@ def getReqFromAS(self,kibanaServer,esServer, esIndex, query):
 			unit.append(i+1)
 			unit.append(method)
 			unit.append(host)
+			unit.append(types)
 			unit.append(path)
 			unit.append(status_code)
 			unit.append(reqAsBase64)
@@ -72,4 +74,5 @@ def getReqFromAS(self,kibanaServer,esServer, esIndex, query):
 			data.append(unit)
 		return data
 	except Exception as e:
-		raise Exception("Not Found")
+		print(e)
+		raise Exception(e)

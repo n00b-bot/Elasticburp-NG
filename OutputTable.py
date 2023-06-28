@@ -1,6 +1,8 @@
 from javax.swing import JTable
 from javax.swing.table import DefaultTableModel
 from java.awt.event import MouseListener
+
+# from javax.swing.table import AbstractTableModel
 import base64
 
 class IssueTableModel(DefaultTableModel):
@@ -52,8 +54,8 @@ class IssueTableMouseListener(MouseListener):
 	def mouseClicked(self, event):
 		if event.getClickCount() == 1:
 			rowData = self.getClickedRow(event)
-			reqb64 = base64.b64decode(rowData[5])
-			resb64 = base64.b64decode(rowData[6])
+			reqb64 = base64.b64decode(rowData[6])
+			resb64 = base64.b64decode(rowData[7])
 			self.AS_requestViewer.setMessage(reqb64, True)
 			self.AS_responseViewer.setMessage(resb64, False)
 
@@ -94,3 +96,33 @@ class IssueTable(JTable):
 	#  	resb64 = base64.b64decode(rowData[6])
 	# 	self.AS_requestViewer.setMessage(reqb64, True)
 	# 	self.AS_responseViewer.setMessage(resb64, False)
+
+
+class IssueGenWordListModel(DefaultTableModel):
+	def __init__(self, data, headings):
+		# call the DefaultTableModel constructor to populate the table
+		DefaultTableModel.__init__(self, data, headings)
+
+	def isCellEditable(self, row, column):
+		"""Returns True if cells are editable."""
+		canEdit = [False, False]
+		return canEdit[column]
+
+	def getColumnClass(self, column):
+		"""Returns the column data class. Optional in this case."""
+		from java.lang import Integer, String, Object
+		# return Object if you don't know the type.
+		columnClasses = [Integer, String]
+		return columnClasses[column]
+	
+class IssueGenWordListTable(JTable):
+	def __init__(self, data, headings,extender):
+		self._extender=extender
+		self.data = data
+		self.headings = headings
+		model = IssueGenWordListModel(data, headings)
+		self.setModel(model)
+		self.setAutoCreateRowSorter(True)
+		self.getTableHeader().setReorderingAllowed(False)
+
+	

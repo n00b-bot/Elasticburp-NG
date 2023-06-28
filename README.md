@@ -3,7 +3,10 @@
 * set the following options in `/etc/elasticsearch/elasticsearch.yml` to allow connection to ElasticSearch from LAN: <br>
   `discovery.type: single-node`<br>
   `network.host: 0.0.0.0`  
-  
+
+* or install with docker
+
+  `docker-compose up -d`
   
 2. Install Jython.
 
@@ -33,6 +36,7 @@ https://user-images.githubusercontent.com/97270758/188400426-299f1227-2d4c-42f0-
 
 7. Enjoy!
 
+
 # Features
 - Requests Sharing
 
@@ -41,6 +45,10 @@ Make it easier to share any request with your teammate using a hash.
 
 Advanced Search using KQL(Kibana Query Language) but you need to install [QueryBuilderApi](https://github.com/n00b-bot/QueryBuilderApi) plugin on Kibana.
 - Reduce duplicated requests
+
+- Gf-Pattern
+
+- Gen Word-list
 
 Using Redis to reduce duplicated requests and improve performance
 # Demo
@@ -57,5 +65,7 @@ Redis [3.0.504](https://github.com/microsoftarchive/redis/releases/tag/win-3.0.5
 - [x] Reduce duplicated requests.
 - [x] Requests Sharing.
 - [x] Advanced Search.
+- [x] Gf-Pattern.
+- [x] Gen Word-list.
 - [ ] Reduce missing requests from ConnectionTimeout.
 
